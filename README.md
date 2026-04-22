@@ -57,17 +57,6 @@ Restart Claude Code. Done.
 
 ---
 
-## Why
-
-Claude Code's built-in statusline omits the numbers that actually govern your day on Pro/Max plans:
-
-- How much of the **context window** the current session is burning, updated **mid-turn** as tools stream output.
-- The rolling **5-hour** and **7-day** usage percentages — and when each resets.
-
-This script renders all three, colored so the critical one is the one you see.
-
----
-
 ## Features
 
 - **Single file, zero dependencies.** Pure bash. No `jq`, no `curl`, no Python, no Node. Runs wherever Claude Code runs.
