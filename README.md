@@ -71,8 +71,8 @@ This script renders all three, colored so the critical one is the one you see.
 ## Features
 
 - **Single file, zero dependencies.** Pure bash. No `jq`, no `curl`, no Python, no Node. Runs wherever Claude Code runs.
-- **Live context tracking.** Anchors to the last authoritative `usage` block in the transcript, then extends with a byte-delta heuristic as tool output appends — so `s%` advances *during* a turn, not just after.
-- **Auto-detected context cap.** 1M-token models render `/1M`; everything else `/200k`.
+- **Authoritative context tracking.** Reads `context_window.used_percentage` and `context_window.context_window_size` directly from Claude Code's statusline input. No transcript scraping, no tokenizer heuristic, no model-name guessing — the number is exactly what Claude Code reports.
+- **Dynamic context cap.** Whatever cap Claude Code exposes gets rendered, formatted as `k`/`M`.
 - **True 24-bit color.** ANSI truecolor with faint-intensity pairings. No Unicode icons. Identical render in iTerm2, Ghostty, Kitty, Alacritty, WezTerm, Terminal.app, Windows Terminal, VS Code terminal.
 - **Branch paths, intact.** `feat/scope/thing` renders fully — no last-segment truncation.
 - **Graceful degradation.** Missing rate-limit fields → percentages hidden. Missing git repo → branch hidden. Missing transcript → context hidden. Nothing ever breaks the line.
@@ -88,7 +88,7 @@ Everything lives in [`statusline.sh`](./statusline.sh). Per render:
 2. Extract fields via `BASH_REMATCH` against the Claude Code statusline JSON.
 3. Read `.git/HEAD` directly — no git subprocess; strip the `refs/heads/` prefix so slashes survive.
 4. Scan project/user `settings.json` line-by-line, break on first match, for the effort level.
-5. Anchor context-window tokens to the last `usage` line in the transcript; add `bytes_appended_since / 4` for the live in-turn estimate.
+5. Extract authoritative context-window fields (`context_window_size`, `current_usage.{input,cache_read,cache_creation}_tokens`) straight from the statusline input JSON.
 6. Acquire epoch time only if a countdown will actually be drawn.
 7. Compose with a 5-stop gradient function, a relative-time humanizer, and one final `printf`.
 

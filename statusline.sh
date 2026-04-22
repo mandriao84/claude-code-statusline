@@ -1,28 +1,24 @@
 #!/bin/bash
 IFS= read -rd '' input
 
-dir=""; model=""; sp=""; wp=""; sr=""; wr=""; tp=""; cp=""
+dir=""; model=""; sp=""; wp=""; sr=""; wr=""; cp=""; cwl=""
 [[ "$input" =~ \"project_dir\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [ -z "$dir" ] && [[ "$input" =~ \"current_dir\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [ -z "$dir" ] && [[ "$input" =~ \"cwd\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [[ "$input" =~ \"display_name\":\"([^\"]*)\" ]] && model=${BASH_REMATCH[1]}
 [ -z "$model" ] && [[ "$input" =~ \"model\":\{[^}]*\"id\":\"([^\"]*)\" ]] && model=${BASH_REMATCH[1]}
 [ -z "$model" ] && model="Claude"
-[[ "$input" =~ \"transcript_path\":\"([^\"]*)\" ]] && tp=${BASH_REMATCH[1]}
-cw=200000; cwl='200k'
-[[ "$model" == *1[mM]* ]] && { cw=1000000; cwl='1M'; }
-if [ -n "$tp" ] && [ -f "$tp" ]; then
-  last=$(grep -b '"usage"' "$tp" | tail -n 1)
-  if [ -n "$last" ]; then
-    off=${last%%:*}; line=${last#*:}
-    it=0; cr=0; cc=0
-    [[ "$line" =~ \"input_tokens\":([0-9]+) ]] && it=${BASH_REMATCH[1]}
-    [[ "$line" =~ \"cache_read_input_tokens\":([0-9]+) ]] && cr=${BASH_REMATCH[1]}
-    [[ "$line" =~ \"cache_creation_input_tokens\":([0-9]+) ]] && cc=${BASH_REMATCH[1]}
-    total=$(wc -c < "$tp"); total=${total// /}
-    delta=$(( total - off - ${#line} - 1 ))
-    (( delta < 0 )) && delta=0
-    cp=$(( (it + cr + cc + delta / 4) * 100 / cw ))
+cws=""
+[[ "$input" =~ \"context_window_size\":([0-9]+) ]] && cws=${BASH_REMATCH[1]}
+if [ -n "$cws" ] && (( cws > 0 )); then
+  it=0; cr=0; cc=0
+  [[ "$input" =~ \"current_usage\":\{[^}]*\"input_tokens\":([0-9]+) ]] && it=${BASH_REMATCH[1]}
+  [[ "$input" =~ \"current_usage\":\{[^}]*\"cache_read_input_tokens\":([0-9]+) ]] && cr=${BASH_REMATCH[1]}
+  [[ "$input" =~ \"current_usage\":\{[^}]*\"cache_creation_input_tokens\":([0-9]+) ]] && cc=${BASH_REMATCH[1]}
+  cp=$(( (it + cr + cc) * 100 / cws ))
+  if   (( cws >= 1000000 )); then cwl="$((cws / 1000000))M"
+  elif (( cws >= 1000    )); then cwl="$((cws / 1000))k"
+  else                            cwl="$cws"
   fi
 fi
 if [[ "$input" == *'"rate_limits"'* ]]; then
