@@ -1,24 +1,37 @@
+<div align="center">
+
 # claude-code-statusline
 
-Zero-dependency, single-file bash statusline for [Claude Code](https://docs.claude.com/en/docs/claude-code). Renders working directory, git branch, Claude model with effort level, 5-hour session usage, and 7-day weekly usage — each percentage colored on a continuous blue→green→yellow→orange→red gradient, with reset countdowns in faint paired tones. One file, no installs, runs in every terminal that runs Claude Code.
+**Zero-dependency bash statusline for [Claude Code](https://docs.claude.com/en/docs/claude-code).**
+One file. No installs. True-color gradients. Live context, session, and weekly usage at a glance.
 
-![deps](https://img.shields.io/badge/deps-zero-blue) ![bash](https://img.shields.io/badge/shell-bash-brightgreen) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
+![deps](https://img.shields.io/badge/deps-zero-blue)
+![bash](https://img.shields.io/badge/shell-bash-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
+</div>
+
+---
+
+```text
+~/dir   @feat/branch/path   model/effort   s42%/200k   h27%>1h   w74%>1d
 ```
-~/dir   @branch   model effort   h27% >1h   w74% >1d
-```
 
-- `~/dir` — working directory basename, faint pale cyan
-- `@branch` — current git branch, pale cyan
-- `model effort` — Claude model name with reasoning-effort level, in Anthropic brand terracotta; effort dimmed
-- `h27% >1h` — 5-hour session quota, colored on the gradient, with reset countdown
-- `w74% >1d` — 7-day weekly quota, same treatment
+<table>
+<tr><th align="left">Segment</th><th align="left">Meaning</th></tr>
+<tr><td><code>~/dir</code></td><td>Working directory basename</td></tr>
+<tr><td><code>@branch</code></td><td>Current git branch — slashes preserved in full</td></tr>
+<tr><td><code>model/effort</code></td><td>Claude model with reasoning-effort level</td></tr>
+<tr><td><code>s%/cap</code></td><td>Live <strong>session context window</strong> usage. Cap auto-detects (200k / 1M)</td></tr>
+<tr><td><code>h%&gt;t</code></td><td>5-hour session quota with reset countdown</td></tr>
+<tr><td><code>w%&gt;t</code></td><td>7-day weekly quota with reset countdown</td></tr>
+</table>
 
-Percentage color follows a 5-stop gradient calibrated so weekly quota pulls your eye the moment it crosses the warning band.
+All percentages share a single blue → green → yellow → orange → red gradient, calibrated so the number that deserves your attention pulls your eye first.
+
+---
 
 ## Install
-
-Pick the script up and wire it into your Claude Code settings:
 
 ```bash
 mkdir -p ~/.claude/terminal
@@ -27,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/mandriao84/claude-code-statusline/m
 chmod +x ~/.claude/terminal/statusline.sh
 ```
 
-Then merge this into `~/.claude/settings.json`:
+Merge into `~/.claude/settings.json`:
 
 ```json
 {
@@ -38,47 +51,71 @@ Then merge this into `~/.claude/settings.json`:
 }
 ```
 
-Restart your Claude Code session. Done.
+Restart Claude Code. Done.
 
-For a project-scoped install, put the script under `<project>/.claude/terminal/statusline.sh` and point the command at `$CLAUDE_PROJECT_DIR` instead of `$HOME`.
+> **Project-scoped install:** drop the script at `<project>/.claude/terminal/statusline.sh` and point the command at `$CLAUDE_PROJECT_DIR`.
+
+---
 
 ## Why
 
-Claude Code's built-in statusline exposes context-window tokens but not the numbers that actually matter on Pro/Max plans: the rolling 5-hour session usage and 7-day weekly quota, plus when each resets. Those fields are present in the statusline input JSON. This script renders them, with color calibrated so the critical one catches your eye.
+Claude Code's built-in statusline omits the numbers that actually govern your day on Pro/Max plans:
+
+- How much of the **context window** the current session is burning, updated **mid-turn** as tools stream output.
+- The rolling **5-hour** and **7-day** usage percentages — and when each resets.
+
+This script renders all three, colored so the critical one is the one you see.
+
+---
 
 ## Features
 
-- **Single file, zero dependencies.** Pure bash. No `jq`, no `curl`, no Python, no Node runtime. Runs wherever Claude Code runs.
-- **Fast.** Extraction is done with bash regex and parameter expansion; no subshells in the hot path. Render cost sits near the bash fork-and-exec floor.
-- **True 24-bit color.** ANSI truecolor foregrounds with faint-intensity styling. No Unicode icons needed. Identical render in iTerm2, Ghostty, Kitty, Alacritty, WezTerm, Terminal.app, Windows Terminal, VS Code terminal.
-- **Safe reset-time caching.** When bash lacks a builtin epoch, the script reads a cached timestamp and refreshes it in a detached background job — no blocking fork per render.
-- **Graceful degradation.** Missing rate-limit fields → percentages hidden. Missing git repo → branch hidden. Missing effort setting → bare model name. Nothing ever breaks the line.
+- **Single file, zero dependencies.** Pure bash. No `jq`, no `curl`, no Python, no Node. Runs wherever Claude Code runs.
+- **Live context tracking.** Anchors to the last authoritative `usage` block in the transcript, then extends with a byte-delta heuristic as tool output appends — so `s%` advances *during* a turn, not just after.
+- **Auto-detected context cap.** 1M-token models render `/1M`; everything else `/200k`.
+- **True 24-bit color.** ANSI truecolor with faint-intensity pairings. No Unicode icons. Identical render in iTerm2, Ghostty, Kitty, Alacritty, WezTerm, Terminal.app, Windows Terminal, VS Code terminal.
+- **Branch paths, intact.** `feat/scope/thing` renders fully — no last-segment truncation.
+- **Graceful degradation.** Missing rate-limit fields → percentages hidden. Missing git repo → branch hidden. Missing transcript → context hidden. Nothing ever breaks the line.
+- **Fork-floor fast.** Hot path is bash built-ins and a single bounded `grep`/`wc` on the transcript.
+
+---
 
 ## Architecture
 
-Everything lives in [`statusline.sh`](./statusline.sh). Per render the script:
+Everything lives in [`statusline.sh`](./statusline.sh). Per render:
 
-1. Slurps stdin with a bash builtin read.
-2. Extracts fields via `BASH_REMATCH` against the Claude Code statusline JSON.
-3. Reads `.git/HEAD` directly — no git subprocess.
-4. Scans `settings.json` line-by-line, breaking on the first match.
-5. Acquires epoch time only when a countdown will actually be drawn.
-6. Composes the line with a 5-stop gradient function, a relative-time humanize function, and a single final `printf`.
+1. Slurp stdin with a bash built-in read.
+2. Extract fields via `BASH_REMATCH` against the Claude Code statusline JSON.
+3. Read `.git/HEAD` directly — no git subprocess; strip the `refs/heads/` prefix so slashes survive.
+4. Scan project/user `settings.json` line-by-line, break on first match, for the effort level.
+5. Anchor context-window tokens to the last `usage` line in the transcript; add `bytes_appended_since / 4` for the live in-turn estimate.
+6. Acquire epoch time only if a countdown will actually be drawn.
+7. Compose with a 5-stop gradient function, a relative-time humanizer, and one final `printf`.
+
+---
 
 ## Configuration
 
-All user-facing choices — colors, gradient stops, separator width, segment labels — are plain constants at the top of the file. No config file, no env vars. Grep and edit.
+All user-facing choices — colors, gradient stops, separator width, segment labels, context caps — are plain constants at the top of the file. No config file, no env vars. Grep and edit.
+
+---
 
 ## Compatibility
 
-- **macOS** — works on the shell shipped with the OS.
-- **Linux** — works on any modern distribution's bash.
-- **Windows** — works under WSL.
-- **tmux / screen** — needs truecolor passthrough enabled in your multiplexer config.
+| Platform | Status |
+|---|---|
+| macOS | Ships-shell ready |
+| Linux | Any modern distribution's bash |
+| Windows | Under WSL |
+| tmux / screen | Requires truecolor passthrough in your multiplexer config |
+
+---
 
 ## Keywords
 
-`claude-code` · `claude-code-statusline` · `statusline` · `status-line` · `anthropic` · `claude` · `claude-cli` · `rate-limit` · `usage-tracker` · `5-hour-limit` · `weekly-quota` · `session-quota` · `context-window` · `pro` · `max` · `terminal` · `ansi` · `truecolor` · `gradient` · `bash` · `zero-dependency` · `dotfiles` · `developer-tools`
+`claude-code` · `statusline` · `anthropic` · `context-window` · `rate-limit` · `5-hour-limit` · `weekly-quota` · `session-quota` · `pro` · `max` · `terminal` · `ansi` · `truecolor` · `gradient` · `bash` · `zero-dependency` · `dotfiles`
+
+---
 
 ## License
 
