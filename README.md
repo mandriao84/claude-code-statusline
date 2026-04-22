@@ -5,10 +5,10 @@ Zero-dependency, single-file bash statusline for [Claude Code](https://docs.clau
 ![deps](https://img.shields.io/badge/deps-zero-blue) ![bash](https://img.shields.io/badge/shell-bash-brightgreen) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ```
-~/playwright   @master   Opus 4.6 low   h27% >1h   w74% >1d
+~/dir   @master   Opus 4.6 low   h27% >1h   w74% >1d
 ```
 
-- `~/playwright` — working directory basename, faint pale cyan
+- `~/dir` — working directory basename, faint pale cyan
 - `@master` — current git branch, pale cyan
 - `Opus 4.6 low` — Claude model name with reasoning-effort level, in Anthropic brand terracotta; effort dimmed
 - `h27% >1h` — 5-hour session quota, colored on the gradient, with reset countdown
