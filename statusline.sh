@@ -1,13 +1,30 @@
 #!/bin/bash
 IFS= read -rd '' input
 
-dir=""; model=""; sp=""; wp=""; sr=""; wr=""
+dir=""; model=""; sp=""; wp=""; sr=""; wr=""; tp=""; cp=""
 [[ "$input" =~ \"project_dir\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [ -z "$dir" ] && [[ "$input" =~ \"current_dir\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [ -z "$dir" ] && [[ "$input" =~ \"cwd\":\"([^\"]*)\" ]] && dir=${BASH_REMATCH[1]}
 [[ "$input" =~ \"display_name\":\"([^\"]*)\" ]] && model=${BASH_REMATCH[1]}
 [ -z "$model" ] && [[ "$input" =~ \"model\":\{[^}]*\"id\":\"([^\"]*)\" ]] && model=${BASH_REMATCH[1]}
 [ -z "$model" ] && model="Claude"
+[[ "$input" =~ \"transcript_path\":\"([^\"]*)\" ]] && tp=${BASH_REMATCH[1]}
+cw=200000; cwl='200k'
+[[ "$model" == *1[mM]* ]] && { cw=1000000; cwl='1M'; }
+if [ -n "$tp" ] && [ -f "$tp" ]; then
+  last=$(grep -b '"usage"' "$tp" | tail -n 1)
+  if [ -n "$last" ]; then
+    off=${last%%:*}; line=${last#*:}
+    it=0; cr=0; cc=0
+    [[ "$line" =~ \"input_tokens\":([0-9]+) ]] && it=${BASH_REMATCH[1]}
+    [[ "$line" =~ \"cache_read_input_tokens\":([0-9]+) ]] && cr=${BASH_REMATCH[1]}
+    [[ "$line" =~ \"cache_creation_input_tokens\":([0-9]+) ]] && cc=${BASH_REMATCH[1]}
+    total=$(wc -c < "$tp"); total=${total// /}
+    delta=$(( total - off - ${#line} - 1 ))
+    (( delta < 0 )) && delta=0
+    cp=$(( (it + cr + cc + delta / 4) * 100 / cw ))
+  fi
+fi
 if [[ "$input" == *'"rate_limits"'* ]]; then
   [[ "$input" =~ \"five_hour\":\{[^}]*\"used_percentage\":([0-9.]+) ]] && sp=${BASH_REMATCH[1]}
   [[ "$input" =~ \"seven_day\":\{[^}]*\"used_percentage\":([0-9.]+) ]] && wp=${BASH_REMATCH[1]}
@@ -19,7 +36,8 @@ branch=""
 if [ -n "$dir" ] && [ -f "$dir/.git/HEAD" ]; then
   read -r head < "$dir/.git/HEAD"
   case "$head" in
-    "ref: "*) branch=${head##*/} ;;
+    "ref: refs/heads/"*) branch=${head#ref: refs/heads/} ;;
+    "ref: "*) branch=${head#ref: } ;;
     *) branch=${head:0:7} ;;
   esac
 fi
@@ -85,19 +103,23 @@ hum() {
 cwd="${esc}[2;38;2;160;210;210m~/${dir##*/}$rst"
 out=$cwd
 [ -n "$branch" ] && { b="${esc}[38;2;160;210;210m@$branch$rst"; [ -n "$out" ] && out+="$sep$b" || out=$b; }
-[ -n "$effort" ] && m="${esc}[38;2;204;120;92m$model ${esc}[2m$effort$rst" || m="${esc}[38;2;204;120;92m$model$rst"
+[ -n "$effort" ] && m="${esc}[38;2;204;120;92m$model${esc}[2m/$effort$rst" || m="${esc}[38;2;204;120;92m$model$rst"
 [ -n "$out" ] && out+=$sep$m || out=$m
 
+if [ -n "$cp" ]; then
+  grad "$cp"
+  out+="$sep${__c}s${cp}%$rst${esc}[2m${__c}/$cwl$rst"
+fi
 if [ -n "$sp" ]; then
   grad "$sp"; printf -v pct '%.0f' "$sp"
   r=""
-  [ -n "$sr" ] && { hum "$sr"; r=" ${esc}[2m$__c>$__h$rst"; }
+  [ -n "$sr" ] && { hum "$sr"; r="${esc}[2m$__c>$__h$rst"; }
   out+="$sep${__c}h${pct}%$rst$r"
 fi
 if [ -n "$wp" ]; then
   grad "$wp"; printf -v pct '%.0f' "$wp"
   r=""
-  [ -n "$wr" ] && { hum "$wr"; r=" ${esc}[2m$__c>$__h$rst"; }
+  [ -n "$wr" ] && { hum "$wr"; r="${esc}[2m$__c>$__h$rst"; }
   out+="$sep${__c}w${pct}%$rst$r"
 fi
 
