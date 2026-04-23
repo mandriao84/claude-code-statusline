@@ -14,15 +14,17 @@ One file. No installs. True-color gradients. Live context, session, and weekly u
 ---
 
 ```text
-~/dir   @feat/branch/path   model/effort   s42%/200k   h27%>1h   w74%>1d
+~/dir   @feat/branch/path/+12-3   model/effort   s42%/200k   c88%/s   h27%>1h   w74%>1d
 ```
 
 <table>
 <tr><th align="left">Segment</th><th align="left">Meaning</th></tr>
 <tr><td><code>~/dir</code></td><td>Working directory basename</td></tr>
 <tr><td><code>@branch</code></td><td>Current git branch — slashes preserved in full</td></tr>
+<tr><td><code>/+a-r</code></td><td>Uncommitted diff against <code>HEAD</code> — insertions and deletions</td></tr>
 <tr><td><code>model/effort</code></td><td>Claude model with reasoning-effort level</td></tr>
 <tr><td><code>s%/cap</code></td><td>Live <strong>session context window</strong> usage. Cap auto-detects (200k / 1M)</td></tr>
+<tr><td><code>c%/s</code></td><td>Transcript-wide <strong>cache-read hit ratio</strong> — share of input tokens served from prompt cache</td></tr>
 <tr><td><code>h%&gt;t</code></td><td>5-hour session quota with reset countdown</td></tr>
 <tr><td><code>w%&gt;t</code></td><td>7-day weekly quota with reset countdown</td></tr>
 </table>
@@ -65,7 +67,9 @@ Restart Claude Code. Done.
 - **True 24-bit color.** ANSI truecolor with faint-intensity pairings. No Unicode icons. Identical render in iTerm2, Ghostty, Kitty, Alacritty, WezTerm, Terminal.app, Windows Terminal, VS Code terminal.
 - **Branch paths, intact.** `feat/scope/thing` renders fully — no last-segment truncation.
 - **Graceful degradation.** Missing rate-limit fields → percentages hidden. Missing git repo → branch hidden. Missing transcript → context hidden. Nothing ever breaks the line.
-- **Fork-floor fast.** Hot path is bash built-ins and a single bounded `grep`/`wc` on the transcript.
+- **Incremental transcript scan.** Cache-hit ratio is computed by appending only new JSONL lines to a persisted counter — re-scanning the whole transcript is avoided across renders.
+- **Diff counter, cache-gated.** Insertions/deletions against `HEAD` are read from git only when the working tree or transcript has moved; otherwise the last value is reused from disk.
+- **Fork-floor fast.** Hot path is bash built-ins; the only subprocess is a single `awk` over the transcript tail and a gated `git diff --shortstat`.
 
 ---
 
@@ -79,7 +83,9 @@ Everything lives in [`statusline.sh`](./statusline.sh). Per render:
 4. Scan project/user `settings.json` line-by-line, break on first match, for the effort level.
 5. Extract authoritative context-window fields (`context_window_size`, `current_usage.{input,cache_read,cache_creation}_tokens`) straight from the statusline input JSON.
 6. Acquire epoch time only if a countdown will actually be drawn.
-7. Compose with a 5-stop gradient function, a relative-time humanizer, and one final `printf`.
+7. Walk the transcript JSONL incrementally — resume from the last line processed, accumulate `cache_read`/`cache_creation`/`input_tokens` into a tiny on-disk cache keyed by transcript path, invalidate on truncation.
+8. Read `git diff --shortstat HEAD` once per tick, but only when the transcript or `.git/index` mtime advanced past the cached value — otherwise reuse the cached `+a -r` pair.
+9. Compose with a 5-stop gradient function, a relative-time humanizer, and one final `printf`.
 
 ---
 

@@ -21,6 +21,34 @@ if [ -n "$cws" ] && (( cws > 0 )); then
   else                            cwl="$cws"
   fi
 fi
+
+tp=""; hit=""
+[[ "$input" =~ \"transcript_path\":\"([^\"]*)\" ]] && tp=${BASH_REMATCH[1]}
+if [ -n "$tp" ] && [ -f "$tp" ]; then
+  st=${TMPDIR:-/tmp}/.sl-cache-${tp##*/}; st=${st%.jsonl}
+  lns=0 scr=0 scc=0 sit=0
+  [ -f "$st" ] && read -r lns scr scc sit < "$st"
+  if [ ! -s "$st" ] || [ "$tp" -nt "$st" ]; then
+    read -r tot dr dw du < <(
+      awk -v s=$(( lns + 1 )) '
+        NR >= s && /"type":"assistant"/ {
+          if (i=index($0,"\"cache_read_input_tokens\":"))     r += substr($0,i+26)+0
+          if (i=index($0,"\"cache_creation_input_tokens\":")) w += substr($0,i+30)+0
+          if (i=index($0,"\"input_tokens\":"))                u += substr($0,i+15)+0
+        }
+        END { printf "%d %d %d %d\n", NR, r, w, u }
+      ' "$tp"
+    )
+    if (( tot < lns )); then
+      rm -f "$st"; scr=0 scc=0 sit=0
+    else
+      scr=$(( scr + dr )); scc=$(( scc + dw )); sit=$(( sit + du ))
+      printf '%d %d %d %d\n' "$tot" "$scr" "$scc" "$sit" > "$st.t" && mv "$st.t" "$st"
+    fi
+  fi
+  sden=$(( scr + scc + sit ))
+  (( sden > 0 )) && hit=$(( scr * 100 / sden ))
+fi
 if [[ "$input" == *'"rate_limits"'* ]]; then
   [[ "$input" =~ \"five_hour\":\{[^}]*\"used_percentage\":([0-9.]+) ]] && sp=${BASH_REMATCH[1]}
   [[ "$input" =~ \"seven_day\":\{[^}]*\"used_percentage\":([0-9.]+) ]] && wp=${BASH_REMATCH[1]}
@@ -63,6 +91,26 @@ if [ -n "$sr$wr" ]; then
   fi
 fi
 
+diff_str=""
+if [ -n "$branch" ]; then
+  dc=${TMPDIR:-/tmp}/.sl-diff-${dir//[^a-zA-Z0-9]/_}
+  da=0 dr=0
+  stale=0
+  [ -f "$dc" ] || stale=1
+  [ -n "$tp" ] && [ "$tp" -nt "$dc" ] && stale=1
+  [ -f "$dir/.git/index" ] && [ "$dir/.git/index" -nt "$dc" ] && stale=1
+  if (( stale )); then
+    sl=$(git --no-optional-locks -C "$dir" diff --shortstat HEAD 2>/dev/null)
+    [[ "$sl" =~ ([0-9]+)\ insertion ]] && da=${BASH_REMATCH[1]}
+    [[ "$sl" =~ ([0-9]+)\ deletion  ]] && dr=${BASH_REMATCH[1]}
+    printf '%d %d\n' "$da" "$dr" > "$dc.t" && mv "$dc.t" "$dc"
+  else
+    read -r da dr < "$dc"
+  fi
+  (( da > 0 )) && diff_str="+${da}"
+  (( dr > 0 )) && diff_str="${diff_str}-${dr}"
+fi
+
 esc=$'\033'
 rst="${esc}[0m"
 dim="${esc}[38;2;120;120;120m"
@@ -98,13 +146,17 @@ hum() {
 
 cwd="${esc}[2;38;2;160;210;210m~/${dir##*/}$rst"
 out=$cwd
-[ -n "$branch" ] && { b="${esc}[38;2;160;210;210m@$branch$rst"; [ -n "$out" ] && out+="$sep$b" || out=$b; }
+[ -n "$branch" ] && { b="${esc}[38;2;160;210;210m@$branch$rst"; [ -n "$diff_str" ] && b+="${esc}[2m${esc}[38;2;160;210;210m/$diff_str$rst"; [ -n "$out" ] && out+="$sep$b" || out=$b; }
 [ -n "$effort" ] && m="${esc}[38;2;204;120;92m$model${esc}[2m/$effort$rst" || m="${esc}[38;2;204;120;92m$model$rst"
 [ -n "$out" ] && out+=$sep$m || out=$m
 
 if [ -n "$cp" ]; then
   grad "$cp"
   out+="$sep${__c}s${cp}%$rst${esc}[2m${__c}/$cwl$rst"
+fi
+if [ -n "$hit" ]; then
+  grad $(( 100 - hit ))
+  out+="$sep${__c}c${hit}%$rst${esc}[2m${__c}/s$rst"
 fi
 if [ -n "$sp" ]; then
   grad "$sp"; printf -v pct '%.0f' "$sp"
