@@ -14,7 +14,7 @@ One file. No installs. True-color gradients. Live context, session, and weekly u
 ---
 
 ```text
-~/dir   @feat/branch/path/+12-3   model/effort   s42%/200k   c88%/s   h27%>1h   w74%>1d
+~/dir   @branch/+N-N   model/effort   sN%/MAX   cN%/s   hN%>Nh   wN%>Nd
 ```
 
 <table>
