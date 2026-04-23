@@ -14,7 +14,7 @@ One file. No installs. True-color gradients. Live context, session, and weekly u
 ---
 
 ```text
-~/dir   @branch/+N-N   model/effort   sN%/cap   cN%/s   hN%>Nh   wN%>Nd
+~/dir   @branch/+N-N   model/effort   s%/cap   c%/s   h%>time   w%>time
 ```
 
 <table>
@@ -23,10 +23,10 @@ One file. No installs. True-color gradients. Live context, session, and weekly u
 <tr><td><code>@branch</code></td><td>Current git branch — slashes preserved in full</td></tr>
 <tr><td><code>/+N-N</code></td><td>Uncommitted diff against <code>HEAD</code> — insertions and deletions</td></tr>
 <tr><td><code>model/effort</code></td><td>Claude model with reasoning-effort level</td></tr>
-<tr><td><code>sN%/cap</code></td><td>Live <strong>session context window</strong> usage. Cap auto-detects (200k / 1M)</td></tr>
-<tr><td><code>cN%/s</code></td><td>Transcript-wide <strong>cache-read hit ratio</strong> — share of input tokens served from prompt cache</td></tr>
-<tr><td><code>hN%&gt;t</code></td><td>5-hour session quota with reset countdown</td></tr>
-<tr><td><code>wN%&gt;t</code></td><td>7-day weekly quota with reset countdown</td></tr>
+<tr><td><code>s%/cap</code></td><td>Live <strong>session context window</strong> usage. Cap auto-detects (200k / 1M)</td></tr>
+<tr><td><code>c%/s</code></td><td>Transcript-wide <strong>cache-read hit ratio</strong> — share of input tokens served from prompt cache</td></tr>
+<tr><td><code>h%&gt;time</code></td><td>5-hour session quota with reset countdown</td></tr>
+<tr><td><code>w%&gt;time</code></td><td>7-day weekly quota with reset countdown</td></tr>
 </table>
 
 All percentages share a single blue → green → yellow → orange → red gradient, calibrated so the number that deserves your attention pulls your eye first.
