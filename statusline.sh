@@ -67,16 +67,7 @@ if [ -n "$dir" ] && [ -f "$dir/.git/HEAD" ]; then
 fi
 
 effort=""
-for f in "$dir/.claude/settings.json" "$HOME/.claude/settings.json"; do
-  [ -f "$f" ] || continue
-  while IFS= read -r line; do
-    if [[ "$line" == *'"effortLevel"'* ]]; then
-      [[ "$line" =~ \"effortLevel\":[[:space:]]*\"([^\"]*)\" ]] && effort=${BASH_REMATCH[1]}
-      break
-    fi
-  done < "$f"
-  [ -n "$effort" ] && break
-done
+[[ "$input" =~ \"effort\":\{[^}]*\"level\":\"([^\"]*)\" ]] && effort=${BASH_REMATCH[1]}
 
 if [ -n "$sr$wr" ]; then
   printf -v now '%(%s)T' -1 2>/dev/null || now=$EPOCHSECONDS
